@@ -150,6 +150,9 @@ module System.Random.MWC
     , Variate(..)
     -- * Deprecated
     , withSystemRandom
+    -- * Fold
+    , foldMUniforms
+
     -- * References
     -- $references
     ) where
@@ -199,7 +202,7 @@ class Variate a where
     -- 2**(-33).  To do the same with 'Double' variates, subtract
     -- 2**(-53).
     uniform :: (PrimMonad m) => Gen (PrimState m) -> m a
-    -- | Generate single uniformly distributed random variable in a
+    -- | Generate a single uniformly distributed random variable in a
     -- given range.
     --
     -- * For integral types inclusive range is used.
@@ -608,6 +611,61 @@ uniform2 f (Gen q) = do
   M.unsafeWrite q coff d''
   return $! f x' y'
 {-# INLINE uniform2 #-}
+
+data AccumWithUniforms a = AWM {
+    _coeff :: {-# UNPACK #-} !Word32
+  , _index :: {-# UNPACK #-} !Int
+  , _accumulator :: !a
+}
+
+-- | Fold-like function allowing to consume random numbers efficiently produced
+-- with a minimal number of reads and writes to the state vector.
+--
+-- To generate @n@ numbers, this function does @n + 2@ reads and @n + 2@ writes.
+foldMUniforms :: PrimMonad m
+              => Int
+              -- ^ How many 'Word32' should be generated
+              -> (a -> Word32 -> m a)
+              -- ^ The accumulating function
+              -> a
+              -- ^ The accumulator's initial value
+              -> Gen (PrimState m)
+              -- ^ The RNG
+              -> m a
+foldMUniforms n f acc0 (Gen q) = do
+  i0 <- fromIntegral <$> M.unsafeRead q ioff
+  c0 <- fromIntegral <$> M.unsafeRead q coff
+
+  let accum (AWM cPrev iPrev accPrev) = do
+        let i = nextIndex iPrev
+        qi <- fromIntegral <$> M.unsafeRead q i
+        let t   = aa * qi + fromIntegral cPrev
+            c'  = fromIntegral (t `shiftR` 32)
+            x   = fromIntegral t + c'
+            (# x', c'' #)  | x < c'    = (# x + 1, c' + 1 #)
+                           | otherwise = (# x,     c' #)
+        M.unsafeWrite q i x'
+        AWM c'' i  <$> f accPrev x'
+
+  (AWM cF iF accF) <- iterateNM accum (AWM c0 i0 acc0) n
+
+  M.unsafeWrite q ioff (fromIntegral iF)
+  M.unsafeWrite q coff (fromIntegral cF)
+
+  return accF
+
+{-# INLINE foldMUniforms #-}
+
+-- Equivalent to @foldM (\_ -> f) a [0..n-1]@.
+iterateNM :: Monad m => (a -> m a) -> a -> Int -> m a
+iterateNM f a0 n0 =
+  go n0 a0
+ where
+  go 0 !a = return a
+  go n  a = f a >>= go (n-1)
+
+{-# INLINE iterateNM #-}
+
 
 -- Type family for fixed size integrals. For signed data types it's
 -- its unsigned couterpart with same size and for unsigned data types
