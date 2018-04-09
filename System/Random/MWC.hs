@@ -108,8 +108,8 @@ import Data.Typeable           (Typeable)
 import Data.Vector.Generic     (Vector)
 import Data.Word
 import qualified Data.Vector.Generic         as G
-import qualified Data.Vector.Unboxed         as I
-import qualified Data.Vector.Unboxed.Mutable as M
+import qualified Data.Vector.Storable         as I
+import qualified Data.Vector.Storable.Mutable as M
 import System.IO        (hPutStrLn, stderr)
 import System.IO.Unsafe (unsafePerformIO)
 import qualified Control.Exception as E
