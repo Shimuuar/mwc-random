@@ -400,11 +400,11 @@ toSeed :: (Vector v Word32) => v Word32 -> Seed
 toSeed v =
   Seed $ I.create $ do
     Gen q <- initialize v
-    unsafeFreezeByteArray q >>= I.unsafeThaw . byteArrayToVector
+    I.unsafeThaw . byteArrayToVector =<< unsafeFreezeByteArray q
 
 byteArrayToVector :: (Vector v Word32) => ByteArray -> v Word32
 byteArrayToVector q = G.fromList $
-  let nWord32 = quot (sizeofByteArray q) SIZEOF_WORD32
+  let nWord32 = sizeofByteArray q `quot` SIZEOF_WORD32
   in map (indexByteArray q) [0..nWord32-1]
 
 vectorToByteArray :: (Vector v Word32, PrimMonad m) => v Word32 -> m (MutableByteArray (PrimState m))
