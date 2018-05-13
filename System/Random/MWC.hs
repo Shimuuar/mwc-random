@@ -109,7 +109,8 @@ import Data.Vector.Generic     (Vector)
 import Data.Word
 import qualified Data.Vector.Generic         as G
 import qualified Data.Vector.Unboxed         as I
-import qualified Data.Vector.Unboxed.Mutable as M
+import qualified Data.Vector.Storable        as S
+import qualified Data.Vector.Storable.Mutable as M
 import System.IO        (hPutStrLn, stderr)
 import System.IO.Unsafe (unsafePerformIO)
 import qualified Control.Exception as E
@@ -397,16 +398,17 @@ newtype Seed = Seed {
 --
 -- > restore (toSeed v) = initialize v
 toSeed :: (Vector v Word32) => v Word32 -> Seed
-toSeed v = Seed $ I.create $ do { Gen q <- initialize v; return q }
+toSeed v = Seed $ G.convert $ S.create $ do { Gen q <- initialize v; return q }
 
 -- | Save the state of a 'Gen', for later use by 'restore'.
 save :: PrimMonad m => Gen (PrimState m) -> m Seed
-save (Gen q) = Seed `liftM` G.freeze q
+save (Gen q) = do v <- G.freeze q
+                  return $ Seed $ G.convert (v :: S.Vector Word32)
 {-# INLINE save #-}
 
 -- | Create a new 'Gen' that mirrors the state of a saved 'Seed'.
 restore :: PrimMonad m => Seed -> m (Gen (PrimState m))
-restore (Seed s) = Gen `liftM` G.thaw s
+restore (Seed s) = Gen `liftM` G.thaw (G.convert s :: S.Vector Word32)
 {-# INLINE restore #-}
 
 
