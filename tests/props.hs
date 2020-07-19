@@ -25,6 +25,11 @@ main = do
         g  <- create
         xs <- replicateM 513 (uniform g)
         assertEqual "[Word32]" xs golden
+    , testCase "foldMUniforms" $ do
+        let n = 513
+        g  <- create
+        xs <- foldMUniforms n (\xs w -> return (w:xs)) [] g
+        take n golden @=? reverse xs
     ]
 
 updateGenState :: GenIO -> IO ()
