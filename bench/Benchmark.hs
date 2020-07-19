@@ -97,6 +97,21 @@ main = do
           | (n,p) <- [ (4, 0.5), (10,0.1), (10,0.6), (10, 0.8), (100,0.4)]
           ]
         ]
+      , bgroup "fast" $
+        let sum32 :: Int -> Word32 -> IO Word32
+            sum32 0 !s = return s
+            sum32 n s  = do w <- uniform mwc
+                            sum32 (n-1) (s + w)
+        in
+        [ bench "fold1"    $ nfIO $ foldMUniforms 1    (\a b -> return $! a + b) 0 mwc
+        , bench "fold10"   $ nfIO $ foldMUniforms 10   (\a b -> return $! a + b) 0 mwc
+        , bench "fold100"  $ nfIO $ foldMUniforms 100  (\a b -> return $! a + b) 0 mwc
+        , bench "fold1000" $ nfIO $ foldMUniforms 1000 (\a b -> return $! a + b) 0 mwc
+        , bench "32x1"     $ nfIO $ sum32 1    0
+        , bench "32x10"    $ nfIO $ sum32 10   0
+        , bench "32x100"   $ nfIO $ sum32 100  0
+        , bench "32x1000"  $ nfIO $ sum32 1000 0
+        ]
       ]
     , bgroup "random"
       [
